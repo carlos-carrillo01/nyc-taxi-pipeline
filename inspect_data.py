@@ -47,6 +47,50 @@ def inspect_csv(file_path: Path) -> None:
     print(df.head())
 
 
+
+def inspect_quality(parquet_path: Path, zones_path: Path) -> None:
+    """Performs data quality checks on the raw data."""
+    trips = pd.read_parquet(parquet_path)
+    zones = pd.read_csv(zones_path)
+
+    print("\n--- Data quality checks ---")
+
+    # Check 1: Trips outside the main month (Already provided as example)
+    outside_month = (
+        (trips["lpep_pickup_datetime"] < pd.Timestamp("2023-12-01"))
+        | (trips["lpep_pickup_datetime"] >= pd.Timestamp("2024-01-01"))
+    )
+    print("1. Pickups outside December 2023:", outside_month.sum())
+
+    # Check 2: Trips where dropoff time is before or equal to pickup time
+    invalid_times = trips["lpep_dropoff_datetime"] <= trips["lpep_pickup_datetime"]
+    print("2. Trips with dropoff time <= pickup time:", invalid_times.sum())
+
+    # Check 3: Trips with zero or negative distance
+    invalid_distance = trips["trip_distance"] <= 0
+    print("3. Trips with non-positive distance:", invalid_distance.sum())
+
+    # Check 4: Trips with a negative total amount
+    negative_amount = trips["total_amount"] < 0
+    print("4. Trips with negative total amount:", negative_amount.sum())
+
+    # Check 5: Null values in the zone lookup LocationID
+    null_zone_ids = zones["LocationID"].isna().sum()
+    print("5. Null values in Zone Lookup LocationID:", null_zone_ids)
+
+    # Check 6: Duplicated LocationIDs in the zone lookup
+    dup_zone_ids = zones["LocationID"].duplicated().sum()
+    print("6. Duplicated LocationIDs in Zone Lookup:", dup_zone_ids)
+
+    # Check 7: Pickup locations not found in the zone catalog (Already provided)
+    unknown_pickup = ~trips["PULocationID"].isin(zones["LocationID"])
+    print("7. Trips with pickup location missing from lookup:", unknown_pickup.sum())
+
+    # Check 8: Dropoff locations not found in the zone catalog (Your turn)
+    unknown_dropoff = ~trips["DOLocationID"].isin(zones["LocationID"])
+    print("8. Trips with dropoff location missing from lookup:", unknown_dropoff.sum())
+
+
 if __name__ == "__main__":
     # Check if the Parquet file exists before trying to read it
     if PARQUET_FILE.exists():
@@ -59,3 +103,7 @@ if __name__ == "__main__":
         inspect_csv(CSV_FILE)
     else:
         print(f"[ERROR] File not found: {CSV_FILE}")
+
+    # Call the data quality inspection
+    if PARQUET_FILE.exists() and CSV_FILE.exists():
+        inspect_quality(PARQUET_FILE, CSV_FILE)
