@@ -91,6 +91,51 @@ def inspect_quality(parquet_path: Path, zones_path: Path) -> None:
     print("8. Trips with dropoff location missing from lookup:", unknown_dropoff.sum())
 
 
+    # PART 1: Combine flags and show summary
+
+    flagged = (
+        outside_month
+        | invalid_times
+        | invalid_distance
+        | negative_amount
+        | unknown_pickup
+        | unknown_dropoff
+    )
+
+    print("\n--- Quality summary ---")
+    print("Total trips:", len(trips))
+    print("Trips with at least one flag:", flagged.sum())
+    print("Trips without these flags:", (~flagged).sum())
+
+    # This assert ensures the math is correct
+    assert flagged.sum() + (~flagged).sum() == len(trips)
+
+    # PART 2: Show examples 
+    review_columns = [
+        "lpep_pickup_datetime",
+        "lpep_dropoff_datetime",
+        "PULocationID",
+        "DOLocationID",
+        "trip_distance",
+        "fare_amount",
+        "total_amount",
+        "payment_type",
+    ]
+
+    print("\n--- Pickups outside the target month ---")
+    print(trips.loc[outside_month, review_columns].to_string(index=False))
+
+    print("\n--- Sample of trips with non-positive duration ---")
+    print(trips.loc[invalid_times, review_columns].head(5).to_string(index=False))
+
+    
+    print("\n--- Sample of trips with non-positive distance ---")
+    print(trips.loc[invalid_distance, review_columns].head(5).to_string(index=False))
+
+    print("\n--- Sample of trips with negative total amount ---")
+    print(trips.loc[negative_amount, review_columns].head(5).to_string(index=False))
+
+
 if __name__ == "__main__":
     # Check if the Parquet file exists before trying to read it
     if PARQUET_FILE.exists():
